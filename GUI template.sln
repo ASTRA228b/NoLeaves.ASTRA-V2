@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35931.197
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "J0ker GUI", "J0ker GUI.csproj", "{46653E58-C2BA-5608-1A4E-CBE4953ADA58}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{46653E58-C2BA-5608-1A4E-CBE4953ADA58}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46653E58-C2BA-5608-1A4E-CBE4953ADA58}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46653E58-C2BA-5608-1A4E-CBE4953ADA58}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46653E58-C2BA-5608-1A4E-CBE4953ADA58}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1E518685-1F87-434B-8568-8CB3A3B31F30}
+	EndGlobalSection
+EndGlobal
