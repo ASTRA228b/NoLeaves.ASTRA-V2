@@ -3,11 +3,9 @@ using System.Collections;
 using System.Net;
 using UnityEngine;
 
-
 namespace NoLeaves.ASTRA
 {
-
-    [BepInPlugin("ASTRA.MODS.NoLeaves", "No Leaves", "5.0.5")]
+    [BepInPlugin("ASTRA.MODS.NoLeaves", "No Leaves", "5.0.6")]
     public class NoLeaves : BaseUnityPlugin
     {
         private const string URL = "https://raw.githubusercontent.com/ASTRA228b/No-Leaves.ASTRA-OBJNAME/main/OBJECTNSME.txt";
@@ -15,44 +13,69 @@ namespace NoLeaves.ASTRA
 
         private void Start()
         {
+            StartCoroutine(StartDelayed());
+        }
+
+        private IEnumerator StartDelayed()
+        {
+            yield return new WaitForSeconds(2f);
             StartCoroutine(LoadFromURL());
         }
 
         private IEnumerator LoadFromURL()
         {
-            using (WebClient CLI = new WebClient())
+            string data = "";
+            try
             {
-                string url = CLI.DownloadString(URL);
-                if (!string.IsNullOrEmpty(url))
+                using (WebClient CLI = new())
                 {
-                    ObjNames = new List<string>(url.Split('\n'));
-                    StartCoroutine(DisableObjects());
+                    data = CLI.DownloadString(URL);
                 }
-
             }
-            yield return null;
-        }
+            catch (Exception e)
+            {
+                Logger.LogInfo("[NoLeaves]: Failed To Load URL ->" + e.Message);
+                yield break;
+            }
 
+            if (!string.IsNullOrWhiteSpace(data))
+            {
+                string[] strings = data.Split(new[] { '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries);
+                ObjNames = new List<string>();
+                for (int i = 0; i < strings.Length; i++)
+                {
+                    ObjNames.Add(strings[i].Trim());
+                }
+                StartCoroutine(DisableObjects());
+            }
+        }
 
         private IEnumerator DisableObjects()
         {
-
+            var wait = new WaitForSeconds(5f);
             while (true)
             {
-                foreach (string raw in ObjNames)
+                if (ObjNames != null && ObjNames.Count > 0)
                 {
-                    string name = raw.Trim();
-                    if (string.IsNullOrEmpty(name)) continue;
-
-                    GameObject obj = GameObject.Find(name);
-                    if (obj != null)
+                    GameObject[] all = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+                    foreach (var obj in all)
                     {
-                        obj.SetActive(false);
+                        if (!obj.activeSelf) continue;
+
+                        foreach (var n in ObjNames)
+                        {
+                            if (string.IsNullOrWhiteSpace(n)) continue;
+                            if (obj.name == n)
+                            {
+                                obj.SetActive(false);
+                                break;
+                            }
+                        }
                     }
                 }
-                yield return new WaitForSeconds(5f);
+                yield return wait;
             }
-
+            
         }
     }
 }
