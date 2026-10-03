@@ -70,17 +70,48 @@ public class NoLeaves : BaseUnityPlugin
     {
         WaitForSeconds wait = new(5f);
 
-        while (true)
+        for (int scan = 1; scan <= 5; scan++)
         {
-            GameObject[] objects = FindObjectsByType<GameObject>(FindObjectsSortMode.None);
-            int found = DisableKnownObjects(objects);
+            GameObject[] objects = FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
-            if (found == 0 && DetectedNames.Count == 0)
-                ProcessAutomaticDetection(objects);
+            int knownFound = DisableKnownObjects(objects);
 
-            DisableDetectedObjects(objects);
-            yield return wait;
+            if (knownFound > 0)
+            {
+                Logger.LogInfo("URL Object Name Found -> Disabled " + knownFound + " Object(s)");
+                Logger.LogInfo("Detection Finished");
+                yield break;
+            }
+
+            if (DetectedNames.Count > 0)
+            {
+                int detectedFound = DisableDetectedObjects(objects);
+
+                if (detectedFound > 0)
+                {
+                    Logger.LogInfo("Automatic Object Name Disabled -> " + detectedFound + " Object(s)");
+                    Logger.LogInfo("Detection Finished");
+                    yield break;
+                }
+            }
+
+            Logger.LogInfo("Automatic Detection Scan " + scan + "/5");
+
+            if (ProcessAutomaticDetection(objects))
+            {
+                objects = FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                int disabled = DisableDetectedObjects(objects);
+
+                Logger.LogInfo("Automatically Disabled " + disabled + " Object(s)");
+                Logger.LogInfo("Detection Finished");
+                yield break;
+            }
+
+            if (scan < 5)
+                yield return wait;
         }
+
+        Logger.LogInfo("Automatic Detection Stopped -> No Safe Leaf Name Found");
     }
 
     private int DisableKnownObjects(GameObject[] objects)
@@ -89,41 +120,43 @@ public class NoLeaves : BaseUnityPlugin
 
         foreach (GameObject obj in objects)
         {
-            if (obj == null || !obj.activeSelf)
-                continue;
-
-            if (!obj.scene.IsValid())
+            if (obj == null || !obj.scene.IsValid())
                 continue;
 
             if (!KnownNames.Contains(obj.name))
                 continue;
 
-            obj.SetActive(false);
             found++;
+
+            if (obj.activeSelf)
+                obj.SetActive(false);
         }
 
         return found;
     }
 
-    private void DisableDetectedObjects(GameObject[] objects)
+    private int DisableDetectedObjects(GameObject[] objects)
     {
-        if (DetectedNames.Count == 0)
-            return;
+        int found = 0;
 
         foreach (GameObject obj in objects)
         {
-            if (obj == null || !obj.activeSelf)
+            if (obj == null || !obj.scene.IsValid())
                 continue;
 
-            if (!obj.scene.IsValid())
+            if (!DetectedNames.Contains(obj.name))
                 continue;
 
-            if (DetectedNames.Contains(obj.name))
+            found++;
+
+            if (obj.activeSelf)
                 obj.SetActive(false);
         }
+
+        return found;
     }
 
-    private void ProcessAutomaticDetection(GameObject[] objects)
+    private bool ProcessAutomaticDetection(GameObject[] objects)
     {
         string detected = DetectLeafName(objects);
 
@@ -131,7 +164,7 @@ public class NoLeaves : BaseUnityPlugin
         {
             PendingCandidate = "";
             PendingHits = 0;
-            return;
+            return false;
         }
 
         if (detected == PendingCandidate)
@@ -145,13 +178,12 @@ public class NoLeaves : BaseUnityPlugin
         Logger.LogInfo("Detection Check -> " + detected + " (" + PendingHits + "/3)");
 
         if (PendingHits < 3)
-            return;
+            return false;
 
         if (DetectedNames.Add(detected))
             Logger.LogInfo("Automatically Detected -> " + detected);
 
-        PendingCandidate = "";
-        PendingHits = 0;
+        return true;
     }
 
     private string DetectLeafName(GameObject[] objects)
@@ -176,6 +208,7 @@ public class NoLeaves : BaseUnityPlugin
                 candidate.Parents.Add(parent);
 
             MeshFilter meshFilter = obj.GetComponent<MeshFilter>();
+
             if (meshFilter != null && meshFilter.sharedMesh != null)
                 candidate.Meshes.Add(meshFilter.sharedMesh);
         }
@@ -198,9 +231,6 @@ public class NoLeaves : BaseUnityPlugin
 
             if (candidate.Meshes.Count == 1)
                 score += 25f;
-
-            if (KnownNames.Contains(pair.Key))
-                score += 1000f;
 
             Logger.LogInfo("Candidate -> " + pair.Key + " | Count: " + candidate.Count + " | Parents: " + candidate.Parents.Count + " | Meshes: " + candidate.Meshes.Count + " | Score: " + score);
 
@@ -228,10 +258,7 @@ public class NoLeaves : BaseUnityPlugin
 
     private bool IsPossibleLeaf(GameObject obj)
     {
-        if (obj == null || !obj.activeSelf)
-            return false;
-
-        if (!obj.scene.IsValid())
+        if (obj == null || !obj.scene.IsValid())
             return false;
 
         if (!IsLeafTempFileName(obj.name))
@@ -250,6 +277,7 @@ public class NoLeaves : BaseUnityPlugin
             return false;
 
         Transform parent = obj.transform.parent;
+
         if (parent == null)
             return false;
 
