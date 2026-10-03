@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -37,10 +38,10 @@ public class NoLeaves : BaseUnityPlugin
         yield return request.SendWebRequest();
         if (request.result != UnityWebRequest.Result.Success)
         {
-            Logger.LogInfo("[NoLeaves]: Failed To Load URL -> " + request.error);
+            Logger.LogInfo("Failed To Load URL -> " + request.error);
 
             if (KnownNames.Count > 0)
-                Logger.LogInfo("[NoLeaves]: Using Cached Object Names");
+                Logger.LogInfo("Using Cached Object Names");
 
             yield break;
         }
@@ -59,7 +60,7 @@ public class NoLeaves : BaseUnityPlugin
                 KnownNames.Add(name);
         }
         SaveCache();
-        Logger.LogInfo("[NoLeaves]: Loaded " + KnownNames.Count + " Object Name(s) From URL");
+        Logger.LogInfo("Loaded " + KnownNames.Count + " Object Name(s) From URL");
     }
 
 
@@ -76,7 +77,7 @@ public class NoLeaves : BaseUnityPlugin
                 if (!string.IsNullOrEmpty(detected))
                 {
                     if (DetectedNames.Add(detected))
-                        Logger.LogInfo("[NoLeaves]: Automatically Detected -> " + detected);
+                        Logger.LogInfo("Automatically Detected -> " + detected);
 
                     DisableDetectedObjects(objects);
                 }
@@ -127,21 +128,14 @@ public class NoLeaves : BaseUnityPlugin
         Dictionary<string, Candidate> candidates = new();
         foreach (GameObject obj in objects)
         {
-            if (obj == null || !obj.activeSelf)
+            if (obj == null)
                 continue;
 
             if (!obj.scene.IsValid())
                 continue;
 
-            if (obj.transform.parent == null)
-                continue;
-
-            Renderer renderer = obj.GetComponent<Renderer>();
-            if (renderer == null)
-                continue;
-
             string name = obj.name;
-            if (string.IsNullOrWhiteSpace(name))
+            if (!IsLeafTempFileName(name))
                 continue;
 
             if (!candidates.TryGetValue(name, out Candidate candidate))
@@ -149,8 +143,12 @@ public class NoLeaves : BaseUnityPlugin
                 candidate = new Candidate();
                 candidates.Add(name, candidate);
             }
+
             candidate.Count++;
-            candidate.Parents.Add(obj.transform.parent);
+            Transform parent = obj.transform.parent;
+            if (parent != null)
+                candidate.Parents.Add(parent);
+
             Transform root = GetBranchRoot(obj.transform);
             if (root != null)
                 candidate.Roots.Add(root);
@@ -158,40 +156,49 @@ public class NoLeaves : BaseUnityPlugin
             MeshFilter meshFilter = obj.GetComponent<MeshFilter>();
             if (meshFilter != null && meshFilter.sharedMesh != null)
                 candidate.Meshes.Add(meshFilter.sharedMesh);
-        }
 
+            Renderer renderer = obj.GetComponent<Renderer>();
+            if (renderer != null)
+                candidate.RendererCount++;
+        }
         string bestName = "";
         float bestScore = 0f;
-
         foreach (KeyValuePair<string, Candidate> pair in candidates)
         {
             Candidate candidate = pair.Value;
 
-            if (candidate.Count < 6)
-                continue;
-
-            if (candidate.Parents.Count < 2)
+            if (candidate.Count < 2)
                 continue;
 
             float score = 0f;
-            score += candidate.Count;
-            score += candidate.Parents.Count * 4f;
-            score += candidate.Roots.Count * 8f;
-
+            score += candidate.Count * 10f;
+            score += candidate.Parents.Count * 6f;
+            score += candidate.Roots.Count * 12f;
+            score += candidate.RendererCount * 2f;
             if (candidate.Meshes.Count == 1)
-                score += 10f;
+                score += 25f;
 
             if (KnownNames.Contains(pair.Key))
                 score += 1000f;
 
+            Logger.LogInfo(": Candidate -> " +pair.Key + " | Count: " + candidate.Count + " | Parents: " + candidate.Parents.Count + " | Roots: " + candidate.Roots.Count + " | Meshes: " + candidate.Meshes.Count + " | Score: " + score);
             if (score > bestScore)
             {
                 bestScore = score;
                 bestName = pair.Key;
             }
         }
-
         return bestName;
+    }
+
+    private bool IsLeafTempFileName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+
+        bool tempFile = name.StartsWith("UnityTempFile-", StringComparison.OrdinalIgnoreCase);
+        bool combined = name.IndexOf("combined by EdMeshCombiner", StringComparison.OrdinalIgnoreCase) >= 0;
+        return tempFile && combined;
     }
 
     private Transform GetBranchRoot(Transform transform)
@@ -202,6 +209,7 @@ public class NoLeaves : BaseUnityPlugin
 
         return current;
     }
+
 
     private void LoadCache()
     {
@@ -218,11 +226,11 @@ public class NoLeaves : BaseUnityPlugin
                 if (!string.IsNullOrWhiteSpace(name))
                     KnownNames.Add(name);
             }
-            Logger.LogInfo("[NoLeaves]: Loaded " + KnownNames.Count + " Cached Object Name(s)");
+            Logger.LogInfo("Loaded " + KnownNames.Count + " Cached Object Name(s)");
         }
         catch (Exception e)
         {
-            Logger.LogInfo("[NoLeaves]: Failed To Load Cache -> " + e.Message);
+            Logger.LogInfo("Failed To Load Cache -> " + e.Message);
         }
     }
 
@@ -234,13 +242,14 @@ public class NoLeaves : BaseUnityPlugin
         }
         catch (Exception e)
         {
-            Logger.LogInfo("[NoLeaves]: Failed To Save Cache -> " + e.Message);
+            Logger.LogInfo("Failed To Save Cache -> " + e.Message);
         }
     }
 
     private class Candidate
     {
         public int Count;
+        public int RendererCount;
         public readonly HashSet<Transform> Parents = new();
         public readonly HashSet<Transform> Roots = new();
         public readonly HashSet<Mesh> Meshes = new();
